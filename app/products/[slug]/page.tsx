@@ -1,12 +1,16 @@
 import Slug from "@/components/Slug";
+import {
+  fetchProductBySlugs,
+  fetchProductSlugs,
+} from "@/controller/product.controller";
 import SlugInterface from "@/interfaces/slug.interface";
+
+export const revalidate = 20 * 60 * 24;
 
 export const generateMetadata = async ({ params }: SlugInterface) => {
   const { slug } = await params;
 
-  const slugRes = await fetch(`${process.env.SERVER}/api/product/${slug}`);
-
-  const data = slugRes.ok ? await slugRes.json() : null;
+  const data = await fetchProductBySlugs(slug);
 
   return {
     title: data ? `Ecom - ${data.title}` : "Ecom",
@@ -31,9 +35,7 @@ export const generateMetadata = async ({ params }: SlugInterface) => {
 const SlugRouter = async ({ params }: SlugInterface) => {
   const { slug } = await params;
 
-  const slugRes = await fetch(`${process.env.SERVER}/api/product/${slug}`);
-
-  const data = slugRes.ok ? await slugRes.json() : null;
+  const data = await fetchProductBySlugs(slug);
 
   return <Slug data={data} />;
 };
@@ -41,9 +43,7 @@ const SlugRouter = async ({ params }: SlugInterface) => {
 export default SlugRouter;
 
 export const generateStaticParams = async () => {
-  const res = await fetch(`${process.env.SERVER}/product?slug=true`);
-
-  const sluglist = await res.json();
+  const sluglist = await fetchProductSlugs();
 
   return sluglist.map((slug: string) => ({
     slug: slug,

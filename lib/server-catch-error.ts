@@ -1,24 +1,11 @@
-<<<<<<< HEAD
-import { NextResponse as res } from "next/server"
+import { NextResponse as res } from "next/server";
 
 const serverCatchError = (err: unknown, status: number = 500) => {
-    if(err instanceof Error) {
-        return res.json({message: err.message}, {status})
-    }
+  if (err instanceof Error) {
+    return res.json({ message: err.message }, { status });
+  }
 
-    return res.json({message: "Internal server error"}, {status})
-}
+  return res.json({ message: "Internal server error" }, { status });
+};
 
-=======
-import { NextResponse as res } from "next/server"
-
-const serverCatchError = (err: unknown, status: number = 500) => {
-    if(err instanceof Error) {
-        return res.json({message: err.message}, {status})
-    }
-
-    return res.json({message: "Internal server error"}, {status})
-}
-
->>>>>>> 28ec0c03fa8749f0a6e22af9582120c326f74948
-export default serverCatchError
+export default serverCatchError;

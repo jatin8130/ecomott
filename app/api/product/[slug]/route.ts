@@ -8,11 +8,12 @@ import ProductModel from "@/models/product.model";
 import SlugInterface from "@/interfaces/slug.interface";
 import { getServerSession } from "next-auth";
 import { authOption } from "../../auth/[...nextauth]/route";
+import { fetchProductBySlugs } from "@/controller/product.controller";
 
 export const GET = async (req: NextRequest, context: SlugInterface) => {
   try {
     const { slug } = await context.params;
-    const product = await ProductModel.findOne({ slug });
+    const product = fetchProductBySlugs(slug);
 
     if (!product)
       return res.json({ message: "Product not found" }, { status: 404 });

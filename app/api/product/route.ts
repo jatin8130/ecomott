@@ -10,6 +10,10 @@ import fs from "fs";
 import path from "path";
 import { getServerSession } from "next-auth";
 import { authOption } from "../auth/[...nextauth]/route";
+import {
+  fetchProduct,
+  fetchProductSlugs,
+} from "@/controller/product.controller";
 
 export async function POST(req: NextRequest) {
   try {
@@ -78,14 +82,11 @@ export async function GET(req: NextRequest) {
     }
 
     if (slug) {
-      const slugs = await ProductModel.distinct("slug");
+      const slugs = fetchProductSlugs();
       return res.json(slugs);
     }
 
-    const products = await ProductModel.find()
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
+    const products = await fetchProduct();
 
     return res.json({ total, data: products });
   } catch (err) {
