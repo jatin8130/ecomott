@@ -7,7 +7,7 @@
     "start": "rimraf .next && next start",
     "dev": "rimraf .next && next dev",
     "build": "rimraf .next && next build",
-    "postbuild": "next-sitemap",
+    "postbuild": "next-sitemap --config next-sitemap.config.cjs",
     "lint": "eslint",
     "admin": "node cli/create-admin.js"
   },

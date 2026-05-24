@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 dotenv.config();
+
 import chalk from "chalk";
 import inquirer from "inquirer";
 import bcrypt from "bcrypt";
@@ -17,27 +18,17 @@ const promptOption = [
 ];
 
 const validateInput = (value, fieldName, minLength = 3) => {
-  if (!value.trim()) {
-    return `${fieldName} is required`;
-  }
-
-  if (value.trim().length < minLength) {
+  if (!value.trim()) return `${fieldName} is required`;
+  if (value.trim().length < minLength)
     return `${fieldName} must be at least ${minLength} characters`;
-  }
-
   return true;
 };
 
 const validateEmail = (email) => {
-  if (!email.trim()) {
-    return "Email is required";
-  }
+  if (!email.trim()) return "Email is required";
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-  if (!emailRegex.test(email)) {
-    return "Enter a valid email";
-  }
+  if (!emailRegex.test(email)) return "Enter a valid email";
 
   return true;
 };
@@ -49,14 +40,12 @@ const inputOption = [
     message: "Enter your fullname:",
     validate: (input) => validateInput(input, "Fullname"),
   },
-
   {
     type: "input",
     name: "email",
     message: "Enter your email:",
     validate: validateEmail,
   },
-
   {
     type: "password",
     name: "password",
@@ -66,30 +55,49 @@ const inputOption = [
   },
 ];
 
+let client;
+
+// 🔥 BUILD MONGODB URI FROM ENV
+const DB_URL = process.env.DB_URL;
+const DB_NAME = process.env.DB_NAME;
+const DB_PARAMS = process.env.DB_PARAMS || "";
+
+const MONGO_URI = `${DB_URL}/${DB_NAME}${DB_PARAMS}`;
+
 const createRole = async (role, db) => {
   try {
     const input = await inquirer.prompt(inputOption);
+
+    const users = db.collection("users");
+
+    const existingUser = await users.findOne({ email: input.email });
+    if (existingUser) {
+      log(chalk.red("Email already exists!"));
+      return;
+    }
 
     input.password = await bcrypt.hash(input.password, 12);
 
     input.role = role;
     input.createdAt = new Date();
     input.updatedAt = new Date();
-    input.__v = 0;
 
-    const User = db.collection("users");
-    await User.insertOne(input);
+    await users.insertOne(input);
 
-    log(chalk.green(`${role} has been created !`));
+    log(chalk.green(`${role} created successfully!`));
+
+    await client.close();
     process.exit(0);
   } catch (err) {
     log(chalk.red(`Signup failed - ${err.message}`));
-    process.exit(0);
+    await client?.close();
+    process.exit(1);
   }
 };
 
-const exitApp = () => {
-  log(chalk.blue("Goodbye! Existing the program."));
+const exitApp = async () => {
+  log(chalk.blue("Goodbye! Exiting program."));
+  await client?.close();
   process.exit(0);
 };
 
@@ -106,15 +114,19 @@ const welcome = async (db) => {
 };
 
 const main = async () => {
-  MongoClient.connect(process.env.DB_URL)
-    .then((conn) => {
-      const db = conn.db(process.env.DB_NAME);
-      welcome(db);
-    })
-    .catch(() => {
-      log(chalk.redBright("Failed to connect with database"));
-      process.exit(0);
-    });
+  try {
+    client = new MongoClient(MONGO_URI);
+
+    await client.connect();
+
+    const db = client.db(DB_NAME);
+
+    await welcome(db);
+  } catch (err) {
+    log(chalk.redBright("Failed to connect with database: " + err.message));
+    await client?.close();
+    process.exit(1);
+  }
 };
 
 main();

@@ -21,6 +21,7 @@ declare module "next-auth" {
       id: string;
       role?: string;
       address?: Address;
+      name?: string;
     } & DefaultSession["user"];
   }
 
@@ -35,6 +36,7 @@ declare module "next-auth/jwt" {
     id?: string;
     role?: string;
     address?: Address;
+    name?: string;
   }
 }
 
@@ -42,29 +44,19 @@ export const authOption: NextAuthOptions = {
   providers: [
     CredentialsProvider({
       name: "Credentials",
-
       credentials: {
-        email: {
-          label: "Email",
-          name: "email",
-        },
-
-        password: {
-          label: "Password",
-          name: "password",
-        },
+        email: { label: "Email", name: "email" },
+        password: { label: "Password", name: "password" },
       },
 
       async authorize(credentials) {
         try {
-          const payload = {
-            email: credentials?.email,
-            password: credentials?.password,
-          };
-
           const { data } = await axios.post(
             `${process.env.SERVER}/api/user/login`,
-            payload,
+            {
+              email: credentials?.email,
+              password: credentials?.password,
+            },
           );
 
           return data;
@@ -91,24 +83,24 @@ export const authOption: NextAuthOptions = {
   },
 
   callbacks: {
+    // -------------------------
+    // GOOGLE / SIGNIN FLOW
+    // -------------------------
     async signIn({ user, account }) {
       if (account?.provider === "google") {
         try {
-          const payload = {
-            email: user.email,
-            provider: "google",
-          };
-
           const { data } = await axios.post(
             `${process.env.SERVER}/api/user/login`,
-            payload,
+            {
+              email: user.email,
+              provider: "google",
+            },
           );
 
           user.id = data.id;
-          user.email = data.email;
-          user.name = data.name;
           user.role = data.role;
           user.address = data.address;
+          user.name = data.name;
 
           return true;
         } catch (err) {
@@ -120,21 +112,41 @@ export const authOption: NextAuthOptions = {
       return true;
     },
 
-    async jwt({ token, user }) {
+    // -------------------------
+    // JWT (MAIN FIX HERE)
+    // -------------------------
+    async jwt({ token, user, trigger }) {
+      // 1. initial login
       if (user) {
         token.id = user.id;
         token.role = user.role;
-        token.address = user.address;
+        token.name = user.name ?? undefined;
+        token.address = user.address ?? undefined;
+      }
+
+      // 2. when session.update() is called
+      if (trigger === "update" && token.id) {
+        const { data } = await axios.get(
+          `${process.env.SERVER}/api/user/${token.id}`,
+        );
+
+        token.address = data.address;
+        token.name = data.name;
+        token.role = data.role;
       }
 
       return token;
     },
 
+    // -------------------------
+    // SESSION
+    // -------------------------
     async session({ session, token }) {
-      if (token && session.user) {
+      if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role;
         session.user.address = token.address;
+        session.user.name = token.name;
       }
 
       return session;

@@ -1,8 +1,6 @@
 import { fetchProduct } from "@/controller/product.controller";
 import Products from "../components/Products";
 
-export const revalidate = 60 * 60 * 24;
-
 export const metadata = {
   title: `Ecom - ${process.env.DOMAIN}`,
   description: "India's best and affordable ecommerce website",

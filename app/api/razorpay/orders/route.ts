@@ -1,36 +1,45 @@
-const db = `${process.env.DB_URL}/${process.env.DB_NAME}`;
 import serverCatchError from "@/lib/server-catch-error";
-import mongoose from "mongoose";
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse as res } from "next/server";
 import Razorpay from "razorpay";
 import { authOption } from "../../auth/[...nextauth]/route";
-mongoose.connect(db);
+import { connectDB } from "@/lib/db";
 
 const rzp = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
+  key_id: process.env.RAZORPAY_KEY_ID!,        // ✅ correct
+  key_secret: process.env.RAZORPAY_KEY_SECRET!, // ✅ correct
 });
 
 export const POST = async (req: NextRequest) => {
   try {
+    await connectDB();
+
     const session = await getServerSession(authOption);
 
-    if (!session) return res.json({ message: "Unauthorized" }, { status: 401 });
-
-    if (session.user.role !== "user")
+    if (!session || session.user.role !== "user") {
       return res.json({ message: "Unauthorized" }, { status: 401 });
+    }
 
     const body = await req.json();
 
-    const payload = {
-      amount: Number(body.amount) * 100,
-      currency: "INR",
-    };
+    // ✅ STRICT validation
+    const amount = Number(body.amount);
 
-    const order = await rzp.orders.create(payload);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.json(
+        { message: "Invalid amount" },
+        { status: 400 }
+      );
+    }
+
+    const order = await rzp.orders.create({
+      amount: Math.round(amount) * 100, // ✅ safe paise conversion
+      currency: "INR",
+    });
+
     return res.json(order);
   } catch (err) {
+    console.error("Razorpay Error:", err);
     return serverCatchError(err);
   }
 };

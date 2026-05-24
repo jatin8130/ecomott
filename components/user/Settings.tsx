@@ -47,28 +47,33 @@ const Settings = () => {
     }
   }, [session.data, userForm]);
 
-  const saveChanges = async (values: FormValues) => {
-    try {
-      const payload = {
-        fullname: values.fullname,
-        address: {
-          street: values.street,
-          city: values.city,
-          state: values.state,
-          country: values.country,
-          pincode: values.pincode,
-        },
-      };
+ const saveChanges = async (values: FormValues) => {
+  try {
+    const payload = {
+      fullname: values.fullname,
+      address: {
+        street: values.street,
+        city: values.city,
+        state: values.state,
+        country: values.country,
+        pincode: values.pincode,
+      },
+    };
 
-      await axios.put("/api/user/profile", payload);
+    // 1. update DB
+    await axios.put("/api/user/profile", payload);
 
-      await session.update();
+    // 2. update NextAuth session (ONLY send what JWT expects)
+    await session.update({
+      address: payload.address,
+      name: values.fullname,
+    });
 
-      message.success("Profile info saved !");
-    } catch (err) {
-      clientCatchError(err);
-    }
-  };
+    message.success("Profile info saved!");
+  } catch (err) {
+    clientCatchError(err);
+  }
+};
 
   return (
     <div>
@@ -76,65 +81,47 @@ const Settings = () => {
 
       <Divider />
 
-      <div>
-        <Form layout="vertical" form={userForm} onFinish={saveChanges}>
-          <div className="grid grid-cols-3 gap-8">
-            <Form.Item
-              label="Fullname"
-              name="fullname"
-              rules={[{ required: true }]}
-            >
-              <Input size="large" />
-            </Form.Item>
-
-            <Form.Item
-              label="Street address"
-              name="street"
-              rules={[{ required: true }]}
-            >
-              <Input size="large" />
-            </Form.Item>
-
-            <Form.Item label="City" name="city" rules={[{ required: true }]}>
-              <Input size="large" />
-            </Form.Item>
-          </div>
-
-          <div className="grid grid-cols-3 gap-8">
-            <Form.Item label="State" name="state" rules={[{ required: true }]}>
-              <Input size="large" />
-            </Form.Item>
-
-            <Form.Item
-              label="Country"
-              name="country"
-              rules={[{ required: true }]}
-            >
-              <Input size="large" />
-            </Form.Item>
-
-            <Form.Item
-              label="Pincode"
-              name="pincode"
-              rules={[{ required: true }]}
-            >
-              <InputNumber size="large" className="w-full!" />
-            </Form.Item>
-          </div>
-
-          <Form.Item>
-            <Button
-              htmlType="submit"
-              size="large"
-              type="primary"
-              danger
-              icon={<SaveOutlined />}
-            >
-              Save now
-            </Button>
+      <Form layout="vertical" form={userForm} onFinish={saveChanges}>
+        <div className="grid grid-cols-3 gap-8">
+          <Form.Item label="Fullname" name="fullname" rules={[{ required: true }]}>
+            <Input size="large" />
           </Form.Item>
-        </Form>
-      </div>
+
+          <Form.Item label="Street address" name="street" rules={[{ required: true }]}>
+            <Input size="large" />
+          </Form.Item>
+
+          <Form.Item label="City" name="city" rules={[{ required: true }]}>
+            <Input size="large" />
+          </Form.Item>
+        </div>
+
+        <div className="grid grid-cols-3 gap-8">
+          <Form.Item label="State" name="state" rules={[{ required: true }]}>
+            <Input size="large" />
+          </Form.Item>
+
+          <Form.Item label="Country" name="country" rules={[{ required: true }]}>
+            <Input size="large" />
+          </Form.Item>
+
+          <Form.Item label="Pincode" name="pincode" rules={[{ required: true }]}>
+            <InputNumber size="large" className="w-full!" />
+          </Form.Item>
+        </div>
+
+        <Form.Item>
+          <Button
+            htmlType="submit"
+            size="large"
+            type="primary"
+            danger
+            icon={<SaveOutlined />}
+          >
+            Save now
+          </Button>
+        </Form.Item>
+      </Form>
     </div>
   );
 };

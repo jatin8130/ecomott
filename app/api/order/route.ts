@@ -1,15 +1,13 @@
-const db = `${process.env.DB_URL}/${process.env.DB_NAME}`;
-import mongoose from "mongoose";
-mongoose.connect(db);
-
 import { NextRequest, NextResponse as res } from "next/server";
 import serverCatchError from "@/lib/server-catch-error";
 import OrderModel from "@/models/order.model";
 import { getServerSession } from "next-auth";
 import { authOption } from "../auth/[...nextauth]/route";
+import { connectDB } from "@/lib/db";
 
 export const POST = async (req: NextRequest) => {
   try {
+    await connectDB()
     const session = await getServerSession(authOption);
 
     if (!session) return res.json({ message: "Unauthorized" }, { status: 401 });
@@ -28,6 +26,7 @@ export const POST = async (req: NextRequest) => {
 
 export const GET = async () => {
   try {
+    await connectDB()
     const session = await getServerSession(authOption);
 
     if (!session) return res.json({ message: "Unauthorized" }, { status: 401 });

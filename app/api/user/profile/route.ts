@@ -1,15 +1,14 @@
-const db = `${process.env.DB_URL}/${process.env.DB_NAME}`;
 import serverCatchError from "@/lib/server-catch-error";
 import UserModel from "@/models/user.model";
-import mongoose from "mongoose";
 import { getServerSession } from "next-auth";
-mongoose.connect(db);
 
 import { NextRequest, NextResponse as res } from "next/server";
 import { authOption } from "../../auth/[...nextauth]/route";
+import { connectDB } from "@/lib/db";
 
 export const PUT = async (req: NextRequest) => {
   try {
+    await connectDB()
     const session = await getServerSession(authOption);
 
     if (!session) return res.json({ message: "Unauthorized" }, { status: 401 });

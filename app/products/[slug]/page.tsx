@@ -5,8 +5,6 @@ import {
 } from "@/controller/product.controller";
 import SlugInterface from "@/interfaces/slug.interface";
 
-export const revalidate = 20 * 60 * 24;
-
 export const generateMetadata = async ({ params }: SlugInterface) => {
   const { slug } = await params;
 

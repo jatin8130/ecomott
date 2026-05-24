@@ -1,29 +1,30 @@
 import { getToken } from "next-auth/jwt";
 import { NextRequest, NextResponse } from "next/server";
 
-export async function proxy(req: NextRequest) {
-  const session = await getToken({
+export async function middleware(req: NextRequest) {
+  const token = await getToken({
     req,
     secret: process.env.NEXTAUTH_SECRET,
   });
 
   const { pathname } = req.nextUrl;
 
-  const userPanel = pathname.startsWith("/user");
-  const adminPanel = pathname.startsWith("/admin");
+  const isUserRoute = pathname.startsWith("/user");
+  const isAdminRoute = pathname.startsWith("/admin");
 
-  if (!session && (adminPanel || userPanel)) {
+  // not logged in
+  if (!token && (isUserRoute || isAdminRoute)) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  if (session) {
-    const role = session.role;
+  const role = token?.role as string | undefined;
 
-    if (adminPanel && role !== "admin") {
+  if (token) {
+    if (isAdminRoute && role !== "admin") {
       return NextResponse.redirect(new URL("/login", req.url));
     }
 
-    if (userPanel && role !== "user") {
+    if (isUserRoute && role !== "user") {
       return NextResponse.redirect(new URL("/login", req.url));
     }
 

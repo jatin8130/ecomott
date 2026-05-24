@@ -6,18 +6,15 @@ import Link from "next/link";
 import axios from "axios";
 import { useSession } from "next-auth/react";
 import { useRazorpay, RazorpayOrderOptions } from "react-razorpay";
+import { useRouter } from "next/navigation";
 
 import priceCalculate from "@/lib/price-calculate";
 import clientCatchError from "@/lib/client-catch-error";
-import { FetchedProductInterface } from "../admin/Products";
-import { useRouter } from "next/navigation";
+
+/* ---------------- TYPES ---------------- */
 
 interface RazorpayPaymentFailedResponse {
   error: {
-    code: string;
-    description: string;
-    source: string;
-    step: string;
     reason: string;
     metadata: {
       order_id: string;
@@ -32,18 +29,20 @@ interface RazorpayNotes {
   user: string;
 }
 
-interface ModifiedRazorpayInterface extends Omit<
-  RazorpayOrderOptions,
-  "notes"
-> {
+interface ModifiedRazorpayInterface
+  extends Omit<RazorpayOrderOptions, "notes"> {
   notes: RazorpayNotes;
 }
 
 interface CartInterface {
-  _id: string;
-  user: string;
-  product: FetchedProductInterface;
-  qnt: number;
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  discount: number;
+  quantity: number;
+  image: string;
+  slug: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -68,13 +67,7 @@ interface PayInterface {
   onFailed?: (payload: PaymentFailedInterface) => void;
 }
 
-interface RazorpayInstance {
-  open: () => void;
-  on: (
-    event: "payment.failed",
-    callback: (response: RazorpayPaymentFailedResponse) => void,
-  ) => void;
-}
+/* ---------------- COMPONENT ---------------- */
 
 const Pay: FC<PayInterface> = ({
   product,
@@ -90,27 +83,30 @@ const Pay: FC<PayInterface> = ({
   const { Razorpay } = useRazorpay();
 
   const isArr = Array.isArray(product);
+  const user = session.data?.user;
+
+  /* ---------------- SAFE CHECK ---------------- */
+
+  const hasAddress = !!user?.address?.pincode;
+
+  /* ---------------- TOTAL AMOUNT ---------------- */
 
   const getTotalAmount = () => {
     let sum = 0;
 
-    if (isArr) {
-      for (const item of product) {
-        const amount =
-          priceCalculate(item.product.price, item.product.discount) * item.qnt;
+    const items = isArr ? product : [product];
 
-        sum += amount;
-      }
-    } else {
-      const amount =
-        priceCalculate(product.product.price, product.product.discount) *
-        product.qnt;
+    for (const item of items) {
+      const price = item.price ?? 0;
+      const discount = item.discount ?? 0;
 
-      sum += amount;
+      sum += priceCalculate(price, discount) * item.quantity;
     }
 
     return sum;
   };
+
+  /* ---------------- ORDER PAYLOAD ---------------- */
 
   const getOrderPayload = () => {
     const products: string[] = [];
@@ -118,126 +114,106 @@ const Pay: FC<PayInterface> = ({
     const discounts: number[] = [];
     const quantities: number[] = [];
 
-    if (!isArr) {
-      return {
-        products: [product.product._id],
-        prices: [product.product.price],
-        discounts: [product.product.discount],
-        quantities: [product.qnt],
-      };
+    const items = isArr ? product : [product];
+
+    for (const item of items) {
+      if (!item) continue;
+
+      // IMPORTANT: backend uses "id", NOT "_id"
+      products.push(item.id);
+      prices.push(item.price ?? 0);
+      discounts.push(item.discount ?? 0);
+      quantities.push(item.quantity);
     }
 
-    for (const item of product) {
-      products.push(item.product._id);
-      prices.push(item.product.price);
-      discounts.push(item.product.discount);
-      quantities.push(item.qnt);
-    }
-
-    return {
-      products,
-      prices,
-      discounts,
-      quantities,
-    };
+    return { products, prices, discounts, quantities };
   };
 
-  const handleSuccess = (payload: PaymentSuccessInterface) => {
-    if (onSuccess) {
-      return onSuccess(payload);
-    }
-
-    return null;
-  };
+  /* ---------------- PAYMENT ---------------- */
 
   const payNow = async () => {
     try {
-      if (!session.data) {
-        throw new Error("Session not initialized yet");
-      }
+      if (!user) throw new Error("Session not ready");
 
-      if (!session.data.user.address?.pincode) {
+      if (!hasAddress) {
         sessionStorage.setItem("message", "Please update your address first");
-        return router.push("/user/settings");
+        router.push("/user/settings");
+        return;
       }
 
-      if (!Razorpay) {
-        throw new Error("Razorpay SDK failed to load");
-      }
+      if (!Razorpay) throw new Error("Razorpay SDK failed to load");
 
-      const payload = {
-        amount: isArr
-          ? getTotalAmount()
-          : priceCalculate(product.product.price, product.product.discount),
-      };
+      const amount = isArr
+  ? getTotalAmount()
+  : priceCalculate(
+      product.price,
+      product.discount
+    );
 
-      const response = await axios.post("/api/razorpay/orders", payload);
-
-      const orderData = response.data;
+      const { data: orderData } = await axios.post("/api/razorpay/orders", {
+  amount: Number(amount), // ✅ raw rupees
+});
 
       const options: ModifiedRazorpayInterface = {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
         name: "ecom shop",
-        description: "Bulk Product",
+        description: "Order Payment",
         amount: orderData.amount,
         order_id: orderData.id,
         currency: "INR",
+
         prefill: {
-          name: session.data.user.name as string,
-          email: session.data.user.email as string,
+          name: user.name as string,
+          email: user.email as string,
         },
+
         notes: {
-          name: session.data.user.name as string,
-          user: session.data.user.id,
+          name: user.name as string,
+          user: user.id,
           orders: JSON.stringify(getOrderPayload()),
         },
-        handler: handleSuccess,
+
+        handler: async (res) => {
+          onSuccess?.(res);
+        },
       };
 
       const rzp = new Razorpay(
-        options as unknown as RazorpayOrderOptions,
-      ) as RazorpayInstance;
+        options as unknown as RazorpayOrderOptions
+      );
 
       rzp.open();
 
       rzp.on("payment.failed", (err: RazorpayPaymentFailedResponse) => {
         setOpen(true);
 
-        const payload: PaymentFailedInterface = {
+        onFailed?.({
           reason: err.error.reason,
           order_id: err.error.metadata.order_id,
           payment_id: err.error.metadata.payment_id,
-        };
-
-        onFailed?.(payload);
+        });
       });
     } catch (err) {
       clientCatchError(err);
     }
   };
 
+  /* ---------------- UI ---------------- */
+
   return (
     <>
-      {theme === "happy" ? (
-        <Button
-          size="large"
-          type="primary"
-          onClick={payNow}
-          className="w-full! py-6! font-medium! text-lg! bg-green-500!"
-        >
-          {title}
-        </Button>
-      ) : (
-        <Button
-          danger
-          size="large"
-          type="primary"
-          onClick={payNow}
-          className="w-full! py-6! font-medium! text-lg!"
-        >
-          {title}
-        </Button>
-      )}
+      <Button
+        size="large"
+        type="primary"
+        onClick={payNow}
+        className={
+          theme === "happy"
+            ? "w-full! py-6! bg-green-500!"
+            : "w-full! py-6!"
+        }
+      >
+        {title}
+      </Button>
 
       <Modal
         open={open}
@@ -248,9 +224,9 @@ const Pay: FC<PayInterface> = ({
         <Result
           status="error"
           title="Payment Failed"
-          subTitle="An error occured during payment capture please try again after sometime"
+          subTitle="Payment was not completed. Please try again."
           extra={[
-            <Link href="/" key="console">
+            <Link href="/" key="home">
               <Button type="primary">Go Back</Button>
             </Link>,
           ]}

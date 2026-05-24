@@ -1,7 +1,3 @@
-const db = `${process.env.DB_URL}/${process.env.DB_NAME}`;
-import mongoose from "mongoose";
-mongoose.connect(db);
-
 import { v4 as uuid } from "uuid";
 import serverCatchError from "@/lib/server-catch-error";
 import { NextRequest, NextResponse as res } from "next/server";
@@ -14,9 +10,11 @@ import {
   fetchProduct,
   fetchProductSlugs,
 } from "@/controller/product.controller";
+import { connectDB } from "@/lib/db";
 
 export async function POST(req: NextRequest) {
   try {
+    await connectDB()
     const session = await getServerSession(authOption);
     if (!session) return res.json({ message: "unauthorized" }, { status: 401 });
 
@@ -65,6 +63,7 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
+    await connectDB()
     const { searchParams } = new URL(req.url);
     const page = Number(searchParams.get("page")) || 1;
     const limit = Number(searchParams.get("limit")) || 16;

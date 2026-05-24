@@ -1,16 +1,14 @@
-const db = `${process.env.DB_URL}/${process.env.DB_NAME}`;
-import mongoose from "mongoose";
-mongoose.connect(db);
-
 import { NextRequest, NextResponse as res } from "next/server";
 import serverCatchError from "@/lib/server-catch-error";
 import { getServerSession } from "next-auth";
 import IdInterface from "@/interfaces/id.interface";
 import { authOption } from "../../auth/[...nextauth]/route";
 import CartModel from "@/models/cart.model";
+import { connectDB } from "@/lib/db";
 
 export const PUT = async (req: NextRequest, context: IdInterface) => {
   try {
+    await connectDB()
     const session = await getServerSession(authOption);
 
     if (!session) return res.json({ message: "Unauthorized" }, { status: 401 });
@@ -43,6 +41,7 @@ export const PUT = async (req: NextRequest, context: IdInterface) => {
 
 export const DELETE = async (req: NextRequest, context: IdInterface) => {
   try {
+    await connectDB()
     const session = await getServerSession(authOption);
 
     if (!session) return res.json({ message: "Unauthorized" }, { status: 401 });

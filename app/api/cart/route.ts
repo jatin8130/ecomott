@@ -1,15 +1,14 @@
-const db = `${process.env.DB_URL}/${process.env.DB_NAME}`;
 import serverCatchError from "@/lib/server-catch-error";
-import mongoose from "mongoose";
 import { getServerSession } from "next-auth";
-mongoose.connect(db);
 
 import { NextRequest, NextResponse as res } from "next/server";
 import { authOption } from "../auth/[...nextauth]/route";
 import CartModel from "@/models/cart.model";
+import { connectDB } from "@/lib/db";
 
 export const POST = async (req: NextRequest) => {
   try {
+    await connectDB()
     const session = await getServerSession(authOption);
 
     if (!session) return res.json({ message: "Unauthorized" }, { status: 401 });
@@ -19,7 +18,6 @@ export const POST = async (req: NextRequest) => {
 
     const body = await req.json();
     body.user = session.user.id;
-
     const update = await CartModel.findOneAndUpdate(
       { user: body.user, product: body.product },
       { $inc: { qnt: 1 } },
@@ -27,7 +25,7 @@ export const POST = async (req: NextRequest) => {
     );
 
     if (update) return res.json(update);
-
+    
     const cart = await CartModel.create(body);
     return res.json(cart);
   } catch (err) {
@@ -37,6 +35,7 @@ export const POST = async (req: NextRequest) => {
 
 export const GET = async (req: NextRequest) => {
   try {
+    await connectDB()
     const session = await getServerSession(authOption);
 
     if (!session) return res.json({ message: "Unauthorized" }, { status: 401 });
